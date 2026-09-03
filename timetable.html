@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>週課表檢視 - Schedule Grid</title>
+  <style>
+    :root {
+      --bg-dark: #0d0e12;
+      --bg-card: #141519;
+      --border-color: #262830;
+      --text-main: #e0e0e0;
+      --text-muted: #8a8d9b;
+      --primary-blue: #2b459d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      padding: 20px;
+    }
+
+    /* 1. 最上方：View / Week / Day 控制器 */
+    .controls-wrapper {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 16px;
+    }
+
+    .control-label {
+      width: 60px;
+      font-size: 14px;
+      color: var(--text-main);
+      font-weight: bold;
+    }
+
+    .view-toggle-container {
+      flex: 1;
+      display: flex;
+      background-color: #0d0e12;
+      border-radius: 8px;
+      padding: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .view-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .view-btn.active {
+      background-color: var(--primary-blue);
+      color: #ffffff;
+    }
+
+    .week-stepper-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #0d0e12;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      height: 42px;
+    }
+
+    .step-btn {
+      width: 50px;
+      height: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .week-value {
+      font-size: 15px;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .day-select-container { flex: 1; }
+
+    .day-dropdown {
+      width: 100%;
+      height: 42px;
+      background-color: #0d0e12;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .day-dropdown:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* 2. 第二個：課表 / Time Line 切換鈕 & 統計卡片 */
+    .mode-switch-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .capsule-toggle {
+      display: inline-flex;
+      width: 100%;
+      max-width: 500px;
+      height: 50px;
+      background-color: #0d0e12;
+      border: 1px solid var(--border-color);
+      border-radius: 25px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .capsule-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .capsule-btn.active {
+      background-color: #2b2e3a;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-color);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    .stat-num {
+      font-size: 20px;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .divider {
+      width: 1px;
+      height: 30px;
+      background-color: var(--border-color);
+    }
+
+    /* 3. 第三個：切換內容面板 */
+    .switch-panel {
+      display: none;
+      margin-bottom: 24px;
+    }
+
+    .switch-panel.active {
+      display: block;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    /* 🎯 關鍵設定：強制表格 layout 固定，週一至週日完全等寬 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      min-width: 700px;
+    }
+
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 0 !important;
+      font-size: 13px;
+    }
+
+    th {
+      background-color: #1a1b20;
+      color: var(--text-main);
+      font-weight: 600;
+      padding: 10px 4px !important;
+    }
+
+    th.time-col { width: 85px; }
+    th.period-col { width: 60px; }
+    th:not(.time-col):not(.period-col) {
+      width: calc((100% - 145px) / 7); /* 禮拜一到禮拜日平均等寬 */
+    }
+
+    .time-col {
+      color: var(--text-muted);
+      font-size: 12px;
+      white-space: pre-line;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .period-col {
+      font-weight: bold;
+      color: #ff9933;
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .evening-row {
+      background-color: #0f1014;
+    }
+
+    td[data-day] {
+      vertical-align: top !important;
+      text-align: left !important;
+      height: 60px;
+    }
+
+    /* 🎯 課程卡片：由上至下、由左至右、畫好畫滿 */
+    .course-card {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 6px;
+      background-color: #1a1c23;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      overflow: hidden;
+    }
+
+    /* 🎯 標題與內文：超出自動省略變成 ... */
+    .course-title {
+      font-weight: bold;
+      font-size: 13px;
+      color: #ffffff;
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+
+    .course-room {
+      font-size: 11px;
+      color: var(--text-muted);
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+      margin-top: auto;
+    }
+
+    .timeline-placeholder {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. 最上方控制器 -->
+  <div class="controls-wrapper">
+    <div class="control-row">
+      <span class="control-label">View</span>
+      <div class="view-toggle-container">
+        <button class="view-btn" id="btnViewDay">Day</button>
+        <button class="view-btn active" id="btnViewWeek">Week</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">Week</span>
+      <div class="week-stepper-container">
+        <button class="step-btn" id="btnPrevWeek">−</button>
+        <span class="week-value" id="weekDisplay">1</span>
+        <button class="step-btn" id="btnNextWeek">+</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">Day</span>
+      <div class="day-select-container">
+        <select id="daySelect" class="day-dropdown" disabled>
+          <option value="Monday">Monday</option>
+          <option value="Tuesday">Tuesday</option>
+          <option value="Wednesday">Wednesday</option>
+          <option value="Thursday">Thursday</option>
+          <option value="Friday">Friday</option>
+          <option value="Saturday">Saturday</option>
+          <option value="Sunday">Sunday</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 第二個：課表 / Time Line 切換鈕 & 數據統計卡片 -->
+  <div class="mode-switch-card">
+    <div class="capsule-toggle">
+      <button class="capsule-btn active" id="btnMainSchedule">課表</button>
+      <button class="capsule-btn" id="btnMainTimeline">Time Line</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-item">
+        <span class="stat-title">COURSES TODAY</span>
+        <span class="stat-num">0</span>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-item">
+        <span class="stat-title">TOTAL CREDITS</span>
+        <span class="stat-num">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 第三個：動態切換區域（課表視圖） -->
+  <div id="schedulePanel" class="switch-panel active">
+    <div class="table-container">
+      <table>
+        <thead>
+  <tr>
+    <th class="time-col">時間</th>
+    <th class="period-col">第n節課</th>
+    <th data-header-day="Mon">一</th>
+    <th data-header-day="Tue">二</th>
+    <th data-header-day="Wed">三</th>
+    <th data-header-day="Thu">四</th>
+    <th data-header-day="Fri">五</th>
+    <th data-header-day="Sat">六</th>
+    <th data-header-day="Sun">日</th>
+  </tr>
+</thead>
+        <tbody>
+          
+<!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">8:20<br>|<br>9:10</td>
+  <td class="period-col">一</td>
+  <td data-day="Mon" data-period="1"></td>
+  <td data-day="Tue" data-period="1"></td>
+  <td data-day="Wed" data-period="1"></td>
+  <td data-day="Thu" data-period="1"></td>
+  <td data-day="Fri" data-period="1"></td>
+  <td data-day="Sat" data-period="1"></td>
+  <td data-day="Sun" data-period="1"></td>
+</tr>
+<!-- 範例：第2節 (period="1") -->
+<tr>
+  <td class="time-col">9:20<br>|<br>10:10</td>
+  <td class="period-col">二</td>
+  <td data-day="Mon" data-period="2"></td>
+  <td data-day="Tue" data-period="2"></td>
+  <td data-day="Wed" data-period="2"></td>
+  <td data-day="Thu" data-period="2"></td>
+  <td data-day="Fri" data-period="2"></td>
+  <td data-day="Sat" data-period="2"></td>
+  <td data-day="Sun" data-period="2"></td>
+</tr><!-- 範例：第一節 (period="3") -->
+<tr>
+  <td class="time-col">10:20<br>|<br>11:10</td>
+  <td class="period-col">三</td>
+  <td data-day="Mon" data-period="3"></td>
+  <td data-day="Tue" data-period="3"></td>
+  <td data-day="Wed" data-period="3"></td>
+  <td data-day="Thu" data-period="3"></td>
+  <td data-day="Fri" data-period="3"></td>
+  <td data-day="Sat" data-period="3"></td>
+  <td data-day="Sun" data-period="3"></td>
+</tr><!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">11:20<br>|<br>12:10</td>
+  <td class="period-col">四</td>
+  <td data-day="Mon" data-period="4"></td>
+  <td data-day="Tue" data-period="4"></td>
+  <td data-day="Wed" data-period="4"></td>
+  <td data-day="Thu" data-period="4"></td>
+  <td data-day="Fri" data-period="4"></td>
+  <td data-day="Sat" data-period="4"></td>
+  <td data-day="Sun" data-period="4"></td>
+</tr><!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">12:30<br>|<br>14:20</td>
+  <td class="period-col">五</td>
+  <td data-day="Mon" data-period="5"></td>
+  <td data-day="Tue" data-period="5"></td>
+  <td data-day="Wed" data-period="5"></td>
+  <td data-day="Thu" data-period="5"></td>
+  <td data-day="Fri" data-period="5"></td>
+  <td data-day="Sat" data-period="5"></td>
+  <td data-day="Sun" data-period="5"></td>
+</tr><!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">14:30<br>|<br>15:20</td>
+  <td class="period-col">六</td>
+  <td data-day="Mon" data-period="6"></td>
+  <td data-day="Tue" data-period="6"></td>
+  <td data-day="Wed" data-period="6"></td>
+  <td data-day="Thu" data-period="6"></td>
+  <td data-day="Fri" data-period="6"></td>
+  <td data-day="Sat" data-period="6"></td>
+  <td data-day="Sun" data-period="6"></td>
+</tr><!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">15:30<br>|<br>16:20</td>
+  <td class="period-col">七</td>
+  <td data-day="Mon" data-period="7"></td>
+  <td data-day="Tue" data-period="7"></td>
+  <td data-day="Wed" data-period="7"></td>
+  <td data-day="Thu" data-period="7"></td>
+  <td data-day="Fri" data-period="7"></td>
+  <td data-day="Sat" data-period="7"></td>
+  <td data-day="Sun" data-period="7"></td>
+</tr><!-- 範例：第一節 (period="1") -->
+<tr>
+  <td class="time-col">16:30<br>|<br>17:20</td>
+  <td class="period-col">八</td>
+  <td data-day="Mon" data-period="8"></td>
+  <td data-day="Tue" data-period="8"></td>
+  <td data-day="Wed" data-period="8"></td>
+  <td data-day="Thu" data-period="8"></td>
+  <td data-day="Fri" data-period="8"></td>
+  <td data-day="Sat" data-period="8"></td>
+  <td data-day="Sun" data-period="8"></td>
+</tr>
+<!-- 範例：晚間時段 (period="17:30") -->
+<tr class="evening-row">
+  <td class="time-col">17:30<br>|<br>18:00</td>
+  <td class="period-col">-</td>
+  <td data-day="Mon" data-period="17:30"></td>
+  <td data-day="Tue" data-period="17:30"></td>
+  <td data-day="Wed" data-period="17:30"></td>
+  <td data-day="Thu" data-period="17:30"></td>
+  <td data-day="Fri" data-period="17:30"></td>
+  <td data-day="Sat" data-period="17:30"></td>
+  <td data-day="Sun" data-period="17:30"></td>
+</tr>
+
+
+          <tr class="evening-row">
+            <td class="time-col">18:00<br>|<br>18:30</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="18:00"></td>
+  <td data-day="Tue" data-period="18:00"></td>
+  <td data-day="Wed" data-period="18:00"></td>
+  <td data-day="Thu" data-period="18:00"></td>
+  <td data-day="Fri" data-period="18:00"></td>
+  <td data-day="Sat" data-period="18:00"></td>
+  <td data-day="Sun" data-period="18:00"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">18:30<br>|<br>19:00</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="18:30"></td>
+  <td data-day="Tue" data-period="18:30"></td>
+  <td data-day="Wed" data-period="18:30"></td>
+  <td data-day="Thu" data-period="18:30"></td>
+  <td data-day="Fri" data-period="18:30"></td>
+  <td data-day="Sat" data-period="18:30"></td>
+  <td data-day="Sun" data-period="18:30"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">19:00<br>|<br>19:30</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="19:00"></td>
+  <td data-day="Tue" data-period="19:00"></td>
+  <td data-day="Wed" data-period="19:00"></td>
+  <td data-day="Thu" data-period="19:00"></td>
+  <td data-day="Fri" data-period="19:00"></td>
+  <td data-day="Sat" data-period="19:00"></td>
+  <td data-day="Sun" data-period="19:00"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">19:30<br>|<br>20:00</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="19:30"></td>
+  <td data-day="Tue" data-period="19:30"></td>
+  <td data-day="Wed" data-period="19:30"></td>
+  <td data-day="Thu" data-period="19:30"></td>
+  <td data-day="Fri" data-period="19:30"></td>
+  <td data-day="Sat" data-period="19:30"></td>
+  <td data-day="Sun" data-period="19:30"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">20:00<br>|<br>20:30</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="20:00"></td>
+  <td data-day="Tue" data-period="20:00"></td>
+  <td data-day="Wed" data-period="20:00"></td>
+  <td data-day="Thu" data-period="20:00"></td>
+  <td data-day="Fri" data-period="20:00"></td>
+  <td data-day="Sat" data-period="20:00"></td>
+  <td data-day="Sun" data-period="20:00"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">20:30<br>|<br>21:00</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="20:30"></td>
+  <td data-day="Tue" data-period="20:30"></td>
+  <td data-day="Wed" data-period="20:30"></td>
+  <td data-day="Thu" data-period="20:30"></td>
+  <td data-day="Fri" data-period="20:30"></td>
+  <td data-day="Sat" data-period="20:30"></td>
+  <td data-day="Sun" data-period="20:30"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">21:00<br>|<br>21:30</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="21:00"></td>
+  <td data-day="Tue" data-period="21:00"></td>
+  <td data-day="Wed" data-period="21:00"></td>
+  <td data-day="Thu" data-period="21:00"></td>
+  <td data-day="Fri" data-period="21:00"></td>
+  <td data-day="Sat" data-period="21:00"></td>
+  <td data-day="Sun" data-period="21:00"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">21:30<br>|<br>22:00</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="21:30"></td>
+  <td data-day="Tue" data-period="21:30"></td>
+  <td data-day="Wed" data-period="21:30"></td>
+  <td data-day="Thu" data-period="21:30"></td>
+  <td data-day="Fri" data-period="21:30"></td>
+  <td data-day="Sat" data-period="21:30"></td>
+  <td data-day="Sun" data-period="21:30"></td>
+          </tr>
+          <tr class="evening-row">
+            <td class="time-col">22:00<br>|<br>22:30</td>
+            <td class="period-col">-</td>
+ <td data-day="Mon" data-period="22:00"></td>
+  <td data-day="Tue" data-period="22:00"></td>
+  <td data-day="Wed" data-period="22:00"></td>
+  <td data-day="Thu" data-period="22:00"></td>
+  <td data-day="Fri" data-period="22:00"></td>
+  <td data-day="Sat" data-period="22:00"></td>
+  <td data-day="Sun" data-period="22:00"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3. 第三個：Time Line 視圖 -->
+  <div id="timelinePanel" class="switch-panel">
+    <div class="timeline-placeholder">
+      <h3>⌛ Time Line 時間軸模式預留區</h3>
+      <p>點擊上方切換鈕即可在此顯示任務時間軸或作業清單。</p>
+    </div>
+  </div>
+
+  <!-- 介面切換邏輯 + 載入外部 app.js -->
+  <!-- 1. 介面控制與邏輯切換 (保留你寫好的部分) -->
+  <script type="module">
+    import './app.js';
+
+    // 面板切換邏輯
+    const btnMainSchedule = document.getElementById('btnMainSchedule');
+    const btnMainTimeline = document.getElementById('btnMainTimeline');
+    const schedulePanel = document.getElementById('schedulePanel');
+    const timelinePanel = document.getElementById('timelinePanel');
+
+    if (btnMainSchedule && btnMainTimeline) {
+      btnMainSchedule.addEventListener('click', () => {
+        btnMainSchedule.classList.add('active');
+        btnMainTimeline.classList.remove('active');
+        schedulePanel.classList.add('active');
+        timelinePanel.classList.remove('active');
+      });
+
+      btnMainTimeline.addEventListener('click', () => {
+        btnMainTimeline.classList.add('active');
+        btnMainSchedule.classList.remove('active');
+        timelinePanel.classList.add('active');
+        schedulePanel.classList.remove('active');
+        // ⚡ 觸發 Apple 行事曆風格時間軸繪製
+         if (typeof window.renderAppleTimeline === 'function') {
+              window.renderAppleTimeline();
+             }
+      });
+    }
+
+    // 控制器邏輯 (週次與 Day View 切換)
+    let currentWeek = 1;
+    const btnViewDay = document.getElementById('btnViewDay');
+    const btnViewWeek = document.getElementById('btnViewWeek');
+    const btnPrevWeek = document.getElementById('btnPrevWeek');
+    const btnNextWeek = document.getElementById('btnNextWeek');
+    const weekDisplay = document.getElementById('weekDisplay');
+    const daySelect = document.getElementById('daySelect');
+
+    if (btnViewDay && btnViewWeek) {
+      btnViewDay.addEventListener('click', () => {
+        btnViewDay.classList.add('active');
+        btnViewWeek.classList.remove('active');
+        if (daySelect) daySelect.disabled = false;
+      });
+
+      btnViewWeek.addEventListener('click', () => {
+        btnViewWeek.classList.add('active');
+        btnViewDay.classList.remove('active');
+        if (daySelect) daySelect.disabled = true;
+      });
+    }
+
+    if (btnPrevWeek && btnNextWeek) {
+  // ⚡ 定義週次變更時的統一刷新函式
+  const updateWeekView = () => {
+    if (weekDisplay) weekDisplay.textContent = currentWeek;
+
+    const cachedCourses = JSON.parse(localStorage.getItem('user_courses') || '[]');
+    const cachedDates = JSON.parse(localStorage.getItem('user_dates') || '{}');
+
+    // 1. ⚡ 重新繪製週課表 (這步會更新週課綱摘要、大考標籤與作業晶片)
+    if (typeof window.renderAllTimetableData === 'function') {
+      window.renderAllTimetableData(cachedCourses, currentWeek, cachedDates);
+    }
+
+    // 2. ⚡ 若目前切換在 Time Line 視圖，同步重新繪製 Time Line
+    const timelinePanel = document.getElementById('timelinePanel');
+    if (timelinePanel && timelinePanel.classList.contains('active')) {
+      if (typeof window.renderAppleTimeline === 'function') {
+        window.renderAppleTimeline();
+      }
+    }
+  };
+
+  btnPrevWeek.addEventListener('click', () => {
+    if (currentWeek > 1) {
+      currentWeek--;
+      updateWeekView(); // ⚡ 觸發課表與 Time Line 重新繪製
+    }
+  });
+
+  btnNextWeek.addEventListener('click', () => {
+    if (currentWeek < 18) {
+      currentWeek++;
+      updateWeekView(); // ⚡ 觸發課表與 Time Line 重新繪製
+    }
+  });
+}
+  </script>
+
+  <!-- 2. 課表繪製模組 -->
+  <script src="renderGrid.js"></script>
+<script src="typePopover.js"></script>
+<!-- ⚡ 新增持續時間選取器模組 -->
+<script src="durationPicker.js"></script>
+  <!-- 3. 正式課程彈窗模組 -->
+  <script src="courseModal.js"></script>
+
+  <!-- 4. 全新待辦事項與持續時間彈窗模組 (須在 customSlots 之前) -->
+  <script src="taskModal.js"></script>
+
+  <!-- 5. 空白格子監聽與待辦晶片渲染模組 -->
+  <script src="customSlots.js"></script>
+<script src="timelineView.js"></script>
+  <!-- 6. 頁面DOMContentLoaded 初次渲染 -->
+  <script>
+    // 🟢 修改後：快取優先（瞬間渲染畫面），背景非同步同步 GAS
+document.addEventListener('DOMContentLoaded', () => {
+  const cachedCourses = JSON.parse(localStorage.getItem('user_courses') || '[]');
+  const cachedDates = JSON.parse(localStorage.getItem('user_dates') || '{}');
+  const currentWeek = parseInt(document.getElementById('weekDisplay')?.textContent) || 1;
+
+  // 1. ⚡ 秒出畫面：立刻使用本地快取繪製課表，完全不等待網路請求
+  if (typeof window.renderAllTimetableData === 'function') {
+    window.renderAllTimetableData(cachedCourses, currentWeek, cachedDates);
+  }
+
+  // 2. ⚡ 背景非同步更新：在背景偷偷向 GAS 抓最新作業，抓完再靜默刷新快取
+  const targetUrl = window.GAS_WEB_APP_URL || 'https://script.google.com/macros/s/AKfycbwF0GeDuWVJnPf1prU77DsXs2NepjtdIboF-OoF-164iYx0OUSYwm_SL0svbtIkO_iDqw/exec';
+  fetch(`${targetUrl}?action=getTasks`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success' && Array.isArray(data.tasks)) {
+        localStorage.setItem('cached_course_tasks', JSON.stringify(data.tasks));
+        // 抓完後默默重新繪製一次最新的作業晶片
+        if (typeof window.renderAllTimetableData === 'function') {
+          window.renderAllTimetableData(cachedCourses, currentWeek, cachedDates);
+        }
+      }
+    })
+    .catch(e => console.warn('背景同步試算表失敗，維持使用本地快取:', e));
+});
+
+  </script>
+</body>
+</html>
