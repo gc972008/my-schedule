@@ -38,7 +38,7 @@
     }
 
     /* ----------------------------------------------------
-       2. 固定側邊導覽列樣式 (Sidebar)
+       2. 側邊導覽列與收合開關樣式 (Sidebar & Toggle Btn)
     ---------------------------------------------------- */
     .sidebar {
       width: 220px;
@@ -48,6 +48,39 @@
       flex-direction: column;
       padding: 20px 0;
       flex-shrink: 0;
+      position: relative;
+      transition: transform 0.3s ease, margin-left 0.3s ease;
+      z-index: 1000;
+    }
+
+    /* 側邊欄收合類別 */
+    .sidebar.collapsed {
+      margin-left: -220px;
+    }
+
+    /* 漢堡切換按鈕 (掛載在側邊欄右上角外部) */
+    .sidebar-toggle-btn {
+      position: absolute;
+      top: 15px;
+      right: -42px;
+      width: 38px;
+      height: 38px;
+      background-color: #1a1b20;
+      border: 1px solid var(--border-color);
+      color: #ffffff;
+      border-radius: 6px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+      transition: background-color 0.2s ease;
+    }
+
+    .sidebar-toggle-btn:hover {
+      background-color: var(--primary-accent);
     }
 
     .sidebar .brand {
@@ -60,6 +93,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      white-space: nowrap;
     }
 
     .nav-tabs {
@@ -80,6 +114,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      white-space: nowrap;
     }
 
     .nav-item:hover {
@@ -95,35 +130,34 @@
     }
 
     /* ----------------------------------------------------
-       3. 主內容區域 Layout & Tab 面板控制（已修正防裁切）
+       3. 主內容區域 Layout & Tab 面板控制
     ---------------------------------------------------- */
     .main-content {
       flex-grow: 1;
-      padding: 0; /* 移除容器 Padding，改由子頁面內裝控制 */
-      overflow: hidden; /* 防止產生雙重捲軸 */
+      padding: 0;
+      overflow: hidden;
       background-color: var(--bg-dark);
       height: 100vh;
+      transition: width 0.3s ease;
     }
 
     .tab-panel {
-      display: none; /* 預設隱藏所有 Tab 面板 */
+      display: none;
       width: 100%;
       height: 100vh;
-      overflow-y: auto; /* 預設內容可滾動 */
+      overflow-y: auto;
       padding: 24px;
     }
 
     .tab-panel.active {
-      display: block; /* 僅顯示當前啟動的 Tab 面板 */
+      display: block;
     }
 
-    /* 針對嵌入 iframe 的 Tab 頁面專屬修正 */
     #tab-schedule {
-      padding: 0; /* 讓嵌入頁面無邊框滿版 */
+      padding: 0;
       overflow: hidden;
     }
 
-    /* 嵌入外部頁面 (如 timetable.html) 的 iframe 樣式 */
     .content-frame {
       width: 100%;
       height: 100%;
@@ -214,12 +248,31 @@
       border: 2px dashed var(--border-color);
       border-radius: 8px;
     }
+
+    /* ----------------------------------------------------
+       5. 手機/平板 RWD 小螢幕優化 (Mobile Responsive)
+    ---------------------------------------------------- */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
 
-  <!-- 1. 側邊頁籤列 (固定於左側) -->
-  <aside class="sidebar">
+  <!-- 1. 側邊頁籤列 (含動態折疊按鈕) -->
+  <aside class="sidebar" id="mainSidebar">
+    <button id="sidebarToggleBtn" class="sidebar-toggle-btn" aria-label="Toggle Sidebar" title="切換選單顯示/隱藏">
+      ☰
+    </button>
     <div class="brand">
       <span>📚</span> 課表管理系統
     </div>
@@ -315,9 +368,10 @@
 
   </main>
 
-  <!-- 3. JavaScript 切換頁籤邏輯 -->
+  <!-- 3. JavaScript 切換頁籤與側邊欄折疊邏輯 -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // A. 切換 Tab 邏輯
       const navItems = document.querySelectorAll('.nav-item');
       const tabPanels = document.querySelectorAll('.tab-panel');
 
@@ -326,27 +380,46 @@
           const targetTabId = item.getAttribute('data-tab');
           if (!targetTabId) return;
 
-          // 移除所有 active 狀態
           navItems.forEach(nav => nav.classList.remove('active'));
           tabPanels.forEach(panel => panel.classList.remove('active'));
 
-          // 切換選取的 Tab 與面板
           item.classList.add('active');
           const targetPanel = document.getElementById(targetTabId);
           if (targetPanel) {
             targetPanel.classList.add('active');
           }
+
+          // ⚡ 手機/小螢幕模式下，點選切換頁籤後自動收合側邊欄
+          if (window.innerWidth <= 768) {
+            document.getElementById('mainSidebar')?.classList.add('collapsed');
+          }
         });
       });
+
+      // B. 側邊欄隱藏/顯示 (漢堡按鈕) 邏輯
+      const sidebar = document.getElementById('mainSidebar');
+      const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+      if (toggleBtn && sidebar) {
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sidebar.classList.toggle('collapsed');
+        });
+      }
+
+      // ⚡ 若為手機/小螢幕（寬度小於等於 768px），載入時預設將側邊欄隱藏，給予課表最大空間
+      if (window.innerWidth <= 768 && sidebar) {
+        sidebar.classList.add('collapsed');
+      }
     });
   </script>
   <script type="module" src="app.js"></script>
   <script src="googleSheetSync.js"></script>
-<script src="courseModal.js"></script>
-<script src="renderGrid.js"></script>
-<script src="dayCountPicker.js"></script>
-<script src="courseManage.js"></script>
-<script src="courseEditModal.js"></script>
+  <script src="courseModal.js"></script>
+  <script src="renderGrid.js"></script>
+  <script src="dayCountPicker.js"></script>
+  <script src="courseManage.js"></script>
+  <script src="courseEditModal.js"></script>
 
 </body>
 </html>
